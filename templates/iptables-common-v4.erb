@@ -1,0 +1,41 @@
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:INPUT-DEFAULT - [0:0]
+:INPUT-HOSTSPECIFIC - [0:0]
+:DROP-ICMP - [0:0]
+:DROP-DEFAULT - [0:0]
+
+-A INPUT -j INPUT-DEFAULT
+-A FORWARD -j INPUT-DEFAULT
+
+-A INPUT-DEFAULT -i lo -j ACCEPT
+
+-A INPUT-DEFAULT -p icmp --icmp-type echo-request -m recent --set  
+-A INPUT-DEFAULT -p icmp --icmp-type echo-request -m recent --update --seconds 1 --hitcount 3 -m comment --comment "Limit ICMP rate" -j DROP-DEFAULT
+-A INPUT-DEFAULT -p icmp --icmp-type any -j ACCEPT
+
+-A INPUT-DEFAULT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A INPUT-DEFAULT -m state --state INVALID -m comment --comment "Drop invalid pkts" -j DROP-DEFAULT
+-A INPUT-DEFAULT -p tcp ! --syn -m state --state NEW -m comment --comment "Drop spoofed TCP sessions" -j DROP-DEFAULT
+
+-A INPUT-DEFAULT -j INPUT-HOSTSPECIFIC
+
+-A INPUT-DEFAULT -p tcp --dport 22 -m state --state NEW -m recent --set
+-A INPUT-DEFAULT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 4 -j DROP-DEFAULT
+-A INPUT-DEFAULT -m state --state NEW -m tcp -p tcp --source 127.0.0.1/32 --dport 22 -m comment --comment "Example Common Rule" -j ACCEPT
+-A INPUT-DEFAULT -m state --state NEW -m tcp -p tcp --source 172.16.0.0/12 --dport 22 -m comment --comment "Testing on Jasons Laptop" -j ACCEPT
+
+-A INPUT-DEFAULT -j DROP-DEFAULT
+
+-A DROP-DEFAULT -m limit --limit 5/m --limit-burst 10 -m comment --comment "Limit the drop logs" -j LOG --log-prefix "IPTables-Rejected: "
+-A DROP-DEFAULT -p udp -m comment --comment "Reject UDP connections" -j REJECT --reject-with icmp-port-unreachable
+-A DROP-DEFAULT -p tcp -m comment --comment "Reject TCP connections" -j REJECT --reject-with tcp-rst
+-A DROP-DEFAULT -p icmp -m comment --comment "Reject ICMP connections" -j DROP
+-A DROP-DEFAULT -m comment --comment "Drop Everything Else" -j REJECT --reject-with icmp-proto-unreachable
+
+<% @hostv4_rules.each do |val| -%>
+<%= val %>
+<% end -%>
+COMMIT
